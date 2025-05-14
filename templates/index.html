@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tracking Data</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f4f4f4;
+    }
+
+    .session-header {
+      background-color: #e0e0e0;
+      cursor: pointer;
+    }
+
+    .session-header:hover {
+      background-color: #d0d0d0;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Tracking Data</h1>
+  <table id="tracking-table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Session ID</th>
+        <th>URL</th>
+        <th>Duration</th>
+      </tr>
+    </thead>
+    <tbody id="tracking-body">
+      <!-- Rows will be dynamically inserted here -->
+    </tbody>
+  </table>
+
+  <script>
+    // Fetch tracking data from the Flask backend
+    async function fetchTrackingData() {
+      try {
+        const response = await fetch('/get-tracking-data');
+        const data = await response.json();
+        renderTrackingData(data);
+      } catch (error) {
+        console.error('Error fetching tracking data:', error);
+      }
+    }
+
+    // Render tracking data into the table
+    function renderTrackingData(trackingData) {
+      const baseUrl = "https://k2-test2.myshopify.com/"; // Replace with the actual base URL dynamically if needed
+
+      const groupedData = trackingData.reduce((acc, item) => {
+        if (!acc[item.session_id]) {
+          acc[item.session_id] = [];
+        }
+        acc[item.session_id].push(item);
+        return acc;
+      }, {});
+
+      const tableBody = document.getElementById('tracking-body');
+      tableBody.innerHTML = ''; // Clear existing rows
+
+      let sessionIndex = 1; // Initialize session index counter
+      let rowIndex = 1; // Initialize row index counter
+
+      Object.keys(groupedData).forEach(sessionId => {
+        // Add session header row with session index
+        const headerRow = document.createElement('tr');
+        headerRow.classList.add('session-header');
+        headerRow.innerHTML = `
+          <td>${sessionIndex++}</td>
+          <td colspan="3">${sessionId}</td>
+        `;
+        headerRow.addEventListener('click', () => {
+          const rows = document.querySelectorAll(`.session-${sessionId}`);
+          rows.forEach(row => row.classList.toggle('hidden'));
+        });
+        tableBody.appendChild(headerRow);
+
+        // Add data rows for the session
+        let previousTimestamp = null; // Track the previous timestamp
+        groupedData[sessionId].forEach(item => {
+          const dataRow = document.createElement('tr');
+          dataRow.classList.add(`session-${sessionId}`, 'hidden');
+          const relativeUrl = item.url.replace(baseUrl, ''); // Remove the base URL
+
+          // Calculate duration
+          const currentTimestamp = new Date(item.timestamp);
+          let duration = '-'; // Default duration for the first row
+          if (previousTimestamp) {
+            const totalSeconds = Math.round((currentTimestamp - previousTimestamp) / 1000); // Duration in seconds
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            duration = `${minutes > 0 ? minutes + ' min ' : ''}${seconds} sec`;
+          }
+          previousTimestamp = currentTimestamp; // Update the previous timestamp
+
+          dataRow.innerHTML = `
+            <td>${rowIndex++}</td>
+            <td>${item.session_id}</td>
+            <td>${relativeUrl}</td>
+            <td>${duration}</td>
+          `;
+          tableBody.appendChild(dataRow);
+        });
+      });
+    }
+
+    // Fetch and render data on page load
+    fetchTrackingData();
+  </script>
+</body>
+</html>
